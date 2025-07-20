@@ -54,10 +54,52 @@
     </div>
 
     <div v-else>
-      <p class="tw-text-xs tw-text-gray-500 tw-text-center tw-mt-2">
-        <font-awesome-icon icon="fa-solid fa-spinner" class="tw-animate-spin"/>
-        Initializing softphone...
-      </p>
+      <div class="tw-text-xs tw-text-gray-500 tw-text-center tw-mt-2">
+        <p class="tw-mb-2">Initializing softphone...</p>
+        <ul class="tw-space-y-2 tw-max-w-xs tw-mx-auto tw-text-left tw-bg-gray-50 tw-p-3 tw-rounded-md tw-shadow-sm">
+          <li v-for="test in diagnosticTests" :key="test.id" 
+              class="tw-flex tw-items-center tw-justify-between tw-p-1"
+              :class="{
+                'tw-bg-green-50': test.status === 'success',
+                'tw-bg-red-50': test.status === 'failed',
+                'tw-bg-blue-50': test.status === 'running',
+              }">
+            <div class="tw-flex tw-items-center">
+              <!-- Test icon based on test type -->
+              <span class="tw-w-6 tw-text-center">
+                <font-awesome-icon :icon="getTestIcon(test.id)" 
+                                  :class="{
+                                    'tw-text-blue-500': test.status === 'running' || test.status === 'pending',
+                                    'tw-text-green-500': test.status === 'success',
+                                    'tw-text-red-500': test.status === 'failed'
+                                  }" />
+              </span>
+              <span class="tw-ml-2">{{ test.name }}</span>
+            </div>
+            
+            <!-- Status indicator -->
+            <span class="tw-w-6 tw-text-center">
+              <!-- Pending: nothing -->
+              <template v-if="test.status === 'pending'"></template>
+              
+              <!-- Running: animated dots -->
+              <template v-else-if="test.status === 'running'">
+                <span class="tw-text-blue-500 tw-min-w-[20px] tw-inline-block">{{ getDotAnimationText() }}</span>
+              </template>
+              
+              <!-- Success: green check -->
+              <template v-else-if="test.status === 'success'">
+                <font-awesome-icon icon="fa-solid fa-check" class="tw-text-green-500" />
+              </template>
+              
+              <!-- Failed: red X -->
+              <template v-else-if="test.status === 'failed'">
+                <font-awesome-icon icon="fa-solid fa-times" class="tw-text-red-500" />
+              </template>
+            </span>
+          </li>
+        </ul>
+      </div>
     </div>
 
     <AdditionalNumbersModal
@@ -73,6 +115,15 @@
         @login="openSoftphone"
     />
 
+    <DiagnosticsModal
+        :visible="showDiagnosticsModal"
+        :all-passed="diagnosticsAllPassed"
+        :failed-tests="diagnosticsFailedTests"
+        :dismissible="diagnosticsDismissible"
+        @close="handleDiagnosticsClose"
+        @retry="runDiagnostics"
+    />
+
     <div
         id="ccpContainer"
         ref="ccpContainer"
@@ -84,6 +135,7 @@
 <script>
 import CallUtils from "../services/callUtils";
 import {getSoftphoneService} from '../services/softphoneFactory';
+import WebRTCDiagnosticsService from "../services/diagnostics/WebRTCDiagnosticsService";
 
 import CallStatus from './CallStatus.vue';
 import IncomingCallActions from './IncomingCallActions.vue';
@@ -92,13 +144,14 @@ import MainControlPanel from './MainControlPanel.vue';
 import ConferenceCallActions from './ConferenceCallActions.vue';
 import AdditionalNumbersModal from './AdditionalNumbersModal.vue';
 import CcpLoginModal from './CcpLoginModal.vue';
+import DiagnosticsModal from './DiagnosticsModal.vue';
 import agentService from "../services/providers/AmazonConnect/agentService";
 
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { library } from "@fortawesome/fontawesome-svg-core";
-import { faSpinner } from "@fortawesome/free-solid-svg-icons";
+import { faSpinner, faCheck, faTimes, faMicrophone, faWifi, faGlobe, faTachometerAlt } from "@fortawesome/free-solid-svg-icons";
 
-library.add(faSpinner)
+library.add(faSpinner, faCheck, faTimes, faMicrophone, faWifi, faGlobe, faTachometerAlt)
 
 export default {
   name: 'Softphone',
@@ -110,6 +163,7 @@ export default {
     ConferenceCallsComponent: ConferenceCallActions,
     AdditionalNumbersModal,
     CcpLoginModal,
+    DiagnosticsModal,
     FontAwesomeIcon
   },
   props: {
@@ -163,13 +217,28 @@ export default {
       showQueueSelectionModal: false,
       showConferenceModal: false,
       showCrmModal: false,
+      // Diagnostics related state
+      diagnosticsService: null,
+      showDiagnosticsModal: false,
+      diagnosticsAllPassed: true,
+      diagnosticsFailedTests: [],
+      diagnosticsDismissible: true,
+      diagnosticsCompleted: false,
+      // Track current diagnostic test and statuses
+      currentDiagnosticTest: null,
+      diagnosticTests: [
+        { id: 'microphone', name: 'Microphone', status: 'pending', result: null },
+        { id: 'connectivity', name: 'Network Connectivity', status: 'pending', result: null },
+        { id: 'webrtc', name: 'WebRTC Stability', status: 'pending', result: null },
+        { id: 'speed', name: 'Network Speed', status: 'pending', result: null }
+      ],
+      dotAnimationInterval: null,
+      dotAnimationState: 0,
     };
   },
   mounted() {
-    this.initializeSoftphone();
-    this.initializedContactStatus();
-    this.loadAgentStates();
-    this.getAgentConfiguration();
+    // Run diagnostics before initializing the softphone
+    this.runDiagnostics();
   },
   watch: {
     'agent.status'(newStatus, oldStatus) {
@@ -177,6 +246,201 @@ export default {
     },
   },
   methods: {
+    /**
+     * Run diagnostic tests to check microphone, connectivity, WebRTC, and speed
+     * @returns {Promise<void>}
+     */
+    async runDiagnostics() {
+      try {
+        // Reset diagnostics state
+        this.diagnosticsAllPassed = true;
+        this.diagnosticsFailedTests = [];
+        this.diagnosticsCompleted = false;
+        this.diagnosticsDismissible = true;
+        
+        // Reset test statuses
+        this.diagnosticTests.forEach(test => {
+          test.status = 'pending';
+          test.result = null;
+        });
+        
+        // Create diagnostics service if it doesn't exist
+        if (!this.diagnosticsService) {
+          this.diagnosticsService = new WebRTCDiagnosticsService();
+        }
+        
+        // Start dot animation
+        this.startDotAnimation();
+        
+        // Run tests sequentially
+        for (const test of this.diagnosticTests) {
+          // Update current test
+          this.currentDiagnosticTest = test.id;
+          test.status = 'running';
+          
+          // Run the test
+          let result;
+          switch (test.id) {
+            case 'microphone':
+              result = await this.diagnosticsService.checkMicrophonePermissions();
+              break;
+            case 'connectivity':
+              result = await this.diagnosticsService.testNetworkConnectivity();
+              break;
+            case 'webrtc':
+              result = await this.diagnosticsService.testWebRTCStability();
+              break;
+            case 'speed':
+              result = await this.diagnosticsService.performSpeedTest();
+              break;
+          }
+          
+          // Update test status and result
+          test.status = result.success ? 'success' : 'failed';
+          test.result = result;
+          
+          // If test failed, add to failed tests
+          if (!result.success) {
+            this.diagnosticsAllPassed = false;
+            this.diagnosticsFailedTests.push({
+              test: test.name,
+              message: result.message,
+              solution: result.solution
+            });
+          }
+        }
+        
+        // Stop dot animation
+        this.stopDotAnimation();
+        
+        // If tests failed, make the modal non-dismissible for critical failures
+        if (!this.diagnosticsAllPassed) {
+          // Check if there are critical failures (microphone or WebRTC)
+          const hasCriticalFailures = this.diagnosticsFailedTests.some(test => 
+            test.test === 'Microphone' || test.test === 'WebRTC Stability'
+          );
+          
+          this.diagnosticsDismissible = !hasCriticalFailures;
+          
+          // Show the diagnostics modal with results
+          this.showDiagnosticsModal = true;
+        }
+        
+        // Mark diagnostics as completed
+        this.diagnosticsCompleted = true;
+        this.currentDiagnosticTest = null;
+        
+        // If all tests passed, proceed with initialization
+        if (this.diagnosticsAllPassed) {
+          // Wait a moment to show all tests completed
+          setTimeout(() => {
+            this.proceedWithInitialization();
+          }, 1500);
+        }
+      } catch (error) {
+        console.error('Error running diagnostics:', error);
+        
+        // Stop dot animation
+        this.stopDotAnimation();
+        
+        // Show error in modal
+        this.diagnosticsAllPassed = false;
+        this.diagnosticsFailedTests = [{
+          test: 'Diagnostics',
+          message: 'An error occurred while running diagnostic tests',
+          solution: 'Please refresh the page and try again. If the problem persists, contact your administrator.'
+        }];
+        
+        // Allow dismissing the error
+        this.diagnosticsDismissible = true;
+        this.diagnosticsCompleted = true;
+        this.currentDiagnosticTest = null;
+        
+        // Show the diagnostics modal with error
+        this.showDiagnosticsModal = true;
+      }
+    },
+    
+    /**
+     * Start the dot animation for the current test
+     */
+    startDotAnimation() {
+      // Clear any existing interval
+      this.stopDotAnimation();
+      
+      // Reset animation state
+      this.dotAnimationState = 0;
+      
+      // Start new interval
+      this.dotAnimationInterval = setInterval(() => {
+        this.dotAnimationState = (this.dotAnimationState + 1) % 4;
+      }, 500);
+    },
+    
+    /**
+     * Stop the dot animation
+     */
+    stopDotAnimation() {
+      if (this.dotAnimationInterval) {
+        clearInterval(this.dotAnimationInterval);
+        this.dotAnimationInterval = null;
+      }
+    },
+    
+    /**
+     * Get the current dot animation text
+     * @returns {string} The dot animation text
+     */
+    getDotAnimationText() {
+      const dots = ['.', '..', '...', ''];
+      return dots[this.dotAnimationState];
+    },
+    
+    /**
+     * Get the icon for a specific test type
+     * @param {string} testId - The test identifier
+     * @returns {string} The FontAwesome icon name
+     */
+    getTestIcon(testId) {
+      switch (testId) {
+        case 'microphone':
+          return 'fa-solid fa-microphone';
+        case 'connectivity':
+          return 'fa-solid fa-wifi';
+        case 'webrtc':
+          return 'fa-solid fa-globe';
+        case 'speed':
+          return 'fa-solid fa-tachometer-alt';
+        default:
+          return 'fa-solid fa-spinner';
+      }
+    },
+    
+    /**
+     * Handle closing the diagnostics modal
+     */
+    handleDiagnosticsClose() {
+      this.showDiagnosticsModal = false;
+      
+      // If diagnostics are completed, proceed with initialization
+      if (this.diagnosticsCompleted) {
+        this.proceedWithInitialization();
+      }
+    },
+    
+    /**
+     * Proceed with softphone initialization after diagnostics
+     */
+    proceedWithInitialization() {
+      this.initializeSoftphone();
+      this.initializedContactStatus();
+      this.loadAgentStates();
+      this.getAgentConfiguration();
+    },
+    
+    /**
+     * Initialize the softphone service
+     */
     initializeSoftphone() {
       this.ccpContainer = this.$refs.ccpContainer;
       this.softphone = getSoftphoneService(this.provider);
