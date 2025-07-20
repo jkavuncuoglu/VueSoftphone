@@ -9,8 +9,17 @@
  * @property {(status: string) => void} [onStatusChange] - Triggered when agent status changes (e.g., Available, Busy).
  * @property {(muted: boolean) => void} [onMuteChange] - Triggered when the mute state changes.
  * @property {(contact: object) => void} [onIncomingCall] - Triggered when an inbound call arrives.
- * @property {() => void} [onCallEnded] - Triggered when the call/contact ends.
+ * @property {(contact: object) => void} [onConnecting] - Triggered when a call is connecting.
+ * @property {(contact: object) => void} [onConnected] - Triggered when a call is connected.
+ * @property {(contact: object) => void} [onCallAccepted] - Triggered when a call is accepted.
+ * @property {(contact: object) => void} [onMissed] - Triggered when a call is missed.
+ * @property {(contact: object) => void} [onPending] - Triggered when a call is pending.
+ * @property {(contact: object) => void} [onRefresh] - Triggered when a call is refreshed.
+ * @property {(contact: object) => void} [onCallEnded] - Triggered when the call/contact ends.
+ * @property {(error: any, contact: object) => void} [onError] - Triggered when an error occurs.
  * @property {() => void} [onLoginRequired] - Triggered when the agent must login to the softphone UI.
+ * @property {() => void} [onLoginSuccess] - Triggered when login is successful.
+ * @property {() => void} [onLogout] - Triggered when the agent logs out.
  */
 
 /**
@@ -57,8 +66,33 @@ export default class ITelephonyService {
     /**
      * Transfer the active call to another number.
      * @param {string} number - The phone number to transfer to.
+     * @param {boolean} [isWarmTransfer=false] - Whether to perform a warm transfer.
      */
-    transferCall(number) {
+    transferCall(number, isWarmTransfer) {
+        throw new Error('Not implemented');
+    }
+
+    /**
+     * End a transfer call.
+     * @param {boolean} [isAgentDisconnect=false] - Whether to disconnect only the agent connection.
+     */
+    endTransferCall(isAgentDisconnect) {
+        throw new Error('Not implemented');
+    }
+
+    /**
+     * Put the current active call on hold.
+     * @returns {Promise} Resolves if the hold call is successful, rejects otherwise.
+     */
+    holdCall() {
+        throw new Error('Not implemented');
+    }
+
+    /**
+     * Resume the current active call from the hold state.
+     * @returns {Promise} Resolves if the resume call is successful, rejects otherwise.
+     */
+    resumeCall() {
         throw new Error('Not implemented');
     }
 

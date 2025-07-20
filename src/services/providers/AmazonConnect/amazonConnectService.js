@@ -66,78 +66,62 @@ export default {
     /**
      * Place an outbound call.
      * @param {string} phoneNumber - The phone number to call.
+     * @returns {Promise} Resolves when the call is successfully placed.
      */
     placeCall(phoneNumber) {
         const agentInstance = agentService.getAgentInstance();
         if (!agentInstance) {
-            alert("Agent is not ready.");
-            return;
+            return Promise.reject(new Error("Agent is not ready."));
         }
 
         const endpoint = window.connect.Endpoint.byPhoneNumber(phoneNumber);
-        agentInstance.connect(endpoint, {
-            success: () => {
-                return true;
-            },
-            failure: (err) => {
-                throw new Error(err)
-            }
-        });
-
-        // Monitor contact events
-        window.connect.contact((contact) => {
-            contact.onConnecting(() => {
-                callbacks.onConnecting?.(contact);
-            });
-
-            contact.onConnected(() => {
-                callbacks.onConnected?.(contact);
-            });
-
-            contact.onCallEnded(() => {
-                callbacks.onCallEnded?.(contact);
+        
+        return new Promise((resolve, reject) => {
+            agentInstance.connect(endpoint, {
+                success: () => {
+                    // Monitor contact events
+                    window.connect.contact((contact) => {
+                        contact.onConnecting(() => callbacks.onConnecting?.(contact));
+                        contact.onConnected(() => callbacks.onConnected?.(contact));
+                        contact.onCallEnded(() => callbacks.onCallEnded?.(contact));
+                    });
+                    resolve(true);
+                },
+                failure: (err) => reject(new Error(`Failed to place call: ${err}`))
             });
         });
     },
 
     /**
      * Hang up the current active call.
+     * @returns {Promise} Resolves when the call is successfully ended.
      */
     hangUpCall() {
-        contactService.endContact()
+        return Promise.resolve(contactService.endContact());
     },
 
     /**
      * Hold Call
+     * @returns {Promise} Resolves if the hold call is successful, rejects otherwise.
      */
     holdCall() {
-        return contactService.holdCall()
-            .then((response) => {
-                return response;
-            })
-            .catch((errorMessage) => {
-                throw new Error(errorMessage);
-            });
+        return contactService.holdCall();
     },
 
     /**
      * Resume Call
+     * @returns {Promise} Resolves if the resume call is successful, rejects otherwise.
      */
     resumeCall() {
-        return contactService.resumeCall()
-            .then((response) => {
-                return response;
-            })
-            .catch((errorMessage) => {
-                throw new Error(errorMessage);
-            });
+        return contactService.resumeCall();
     },
 
 
     /**
      * Transfer the current call to another number.
      * @param {string} number - The phone number to transfer the call to.
-     * @param isWarmTransfer
+     * @param {boolean} [isWarmTransfer=false] - Whether to perform a warm transfer.
+     * @returns {Promise} Resolves when the transfer is successful.
      */
     transferCall(number, isWarmTransfer = false) {
         const contactInstance = contactService.getContactInstance();
@@ -146,92 +130,349 @@ export default {
         }
 
         const endpoint = window.connect.Endpoint.byPhoneNumber(number);
-
-        try {
+        
+        return new Promise((resolve, reject) => {
             if (isWarmTransfer) {
-
-                return contactInstance.addConnection(endpoint, {
-                    success: () => {
-                        return true
-                    },
-                    failure: (error) => {
-                        throw new Error(error);
-                    },
+                contactInstance.addConnection(endpoint, {
+                    success: () => resolve(true),
+                    failure: (error) => reject(new Error(`Failed to initiate warm transfer: ${error}`))
                 });
             } else {
-                return contactInstance.toggleActiveConnections(endpoint, {
-                    success: () => {
-                        return false;
-                    },
-                    failure: (error) => {
-                        throw new Error(error);
-                    },
+                contactInstance.toggleActiveConnections(endpoint, {
+                    success: () => resolve(false),
+                    failure: (error) => reject(new Error(`Failed to transfer call: ${error}`))
                 });
             }
-        } catch (error) {
-            throw new Error(error);
-        }
+        });
     },
 
+    /**
+     * End a transfer call.
+     * @param {boolean} [isAgentDisconnect=false] - Whether to disconnect only the agent connection.
+     * @returns {Promise} Resolves when the transfer call is ended.
+     */
     endTransferCall(isAgentDisconnect = false) {
         const contactInstance = contactService.getContactInstance();
         if (!contactInstance) {
-            throw new Error("No active contact available to end.");
+            return Promise.reject(new Error("No active contact available to end."));
         }
 
-        try {
-            if (isAgentDisconnect) {
-                // Disconnect the agent connection only
-                const agentConnection = contactInstance.getAgentConnection();
-                if (agentConnection) {
-                    agentConnection.destroy({
-                        success: () => {},
-                        failure: (error) => {}
-                    });
-                }
-            } else {
-                // End the entire transfer call
-                this.hangUpCall()
+        if (isAgentDisconnect) {
+            // Disconnect the agent connection only
+            const agentConnection = contactInstance.getAgentConnection();
+            if (!agentConnection) {
+                return Promise.resolve(); // No agent connection to disconnect
             }
-        } catch (error) {
-            throw new Error(error);
+            
+            return new Promise((resolve, reject) => {
+                agentConnection.destroy({
+                    success: () => resolve(),
+                    failure: (error) => reject(new Error(`Failed to disconnect agent: ${error}`))
+                });
+            });
+        } else {
+            // End the entire transfer call
+            this.hangUpCall();
+            return Promise.resolve();
         }
+    },
+
+    /**
+     * Transfers the current call to a specific queue.
+     * @param {string} queueId - The ID of the queue to transfer to.
+     * @returns {Promise} Resolves when the queue transfer is successful.
+     */
+    transferToQueue(queueId) {
+        const contactInstance = contactService.getContactInstance();
+        if (!contactInstance) {
+            return Promise.reject(new Error("No active contact available for transfer."));
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                const queueEndpoint = window.connect.Endpoint.byQueueId(queueId);
+                contactInstance.toggleActiveConnections(queueEndpoint, {
+                    success: () => resolve(true),
+                    failure: (error) => reject(new Error(`Failed to transfer to queue: ${error}`))
+                });
+            } catch (error) {
+                reject(new Error(`Error transferring to queue: ${error}`));
+            }
+        });
+    },
+
+    /**
+     * Performs a warm transfer to a queue by first connecting to the queue
+     * and then allowing the agent to speak with the queue before completing the transfer.
+     * @param {string} queueId - The ID of the queue to transfer to.
+     * @returns {Promise} Resolves when the warm queue transfer is initiated.
+     */
+    warmTransferToQueue(queueId) {
+        const contactInstance = contactService.getContactInstance();
+        if (!contactInstance) {
+            return Promise.reject(new Error("No active contact available for transfer."));
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                const queueEndpoint = window.connect.Endpoint.byQueueId(queueId);
+                contactInstance.addConnection(queueEndpoint, {
+                    success: () => resolve(true),
+                    failure: (error) => reject(new Error(`Failed to initiate warm transfer to queue: ${error}`))
+                });
+            } catch (error) {
+                reject(new Error(`Error initiating warm transfer to queue: ${error}`));
+            }
+        });
+    },
+
+    /**
+     * Gets a list of available queues for transfer.
+     * @returns {Promise<Array>} Resolves with an array of available queues.
+     */
+    getAvailableQueues() {
+        return new Promise((resolve, reject) => {
+            try {
+                window.connect.core.getQueues({
+                    success: (queues) => resolve(queues),
+                    failure: (error) => reject(new Error(`Failed to get available queues: ${error}`))
+                });
+            } catch (error) {
+                reject(new Error(`Error getting available queues: ${error}`));
+            }
+        });
+    },
+
+    /**
+     * Initiates a conference call by adding a third party to the current call.
+     * @param {string} phoneNumber - The phone number to add to the conference.
+     * @returns {Promise} Resolves when the conference is successfully initiated.
+     */
+    initiateConference(phoneNumber) {
+        const contactInstance = contactService.getContactInstance();
+        if (!contactInstance) {
+            return Promise.reject(new Error("No active contact available for conference."));
+        }
+
+        const endpoint = window.connect.Endpoint.byPhoneNumber(phoneNumber);
+
+        return new Promise((resolve, reject) => {
+            try {
+                contactInstance.addConnection(endpoint, {
+                    success: () => resolve(true),
+                    failure: (error) => reject(new Error(`Failed to initiate conference: ${error}`))
+                });
+            } catch (error) {
+                reject(new Error(`Error initiating conference: ${error}`));
+            }
+        });
+    },
+
+    /**
+     * Merges all connections into a conference call.
+     * @returns {Promise} Resolves when the conference is successfully merged.
+     */
+    mergeConnections() {
+        const contactInstance = contactService.getContactInstance();
+        if (!contactInstance) {
+            return Promise.reject(new Error("No active contact available for merging connections."));
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                // Get all connections
+                const connections = contactInstance.getConnections();
+                if (connections.length < 3) {
+                    return reject(new Error("Not enough connections to merge into a conference."));
+                }
+
+                // Merge all connections
+                contactInstance.mergeConnections({
+                    success: () => resolve(true),
+                    failure: (error) => reject(new Error(`Failed to merge connections: ${error}`))
+                });
+            } catch (error) {
+                reject(new Error(`Error merging connections: ${error}`));
+            }
+        });
+    },
+
+    /**
+     * Removes a specific connection from the conference call.
+     * @param {string} connectionId - The ID of the connection to remove.
+     * @returns {Promise} Resolves when the connection is successfully removed.
+     */
+    removeFromConference(connectionId) {
+        const contactInstance = contactService.getContactInstance();
+        if (!contactInstance) {
+            return Promise.reject(new Error("No active contact available."));
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                const connections = contactInstance.getConnections();
+                const connectionToRemove = connections.find(conn => conn.getConnectionId() === connectionId);
+
+                if (!connectionToRemove) {
+                    return reject(new Error(`Connection with ID ${connectionId} not found.`));
+                }
+
+                connectionToRemove.destroy({
+                    success: () => resolve(true),
+                    failure: (error) => reject(new Error(`Failed to remove connection: ${error}`))
+                });
+            } catch (error) {
+                reject(new Error(`Error removing connection: ${error}`));
+            }
+        });
+    },
+
+    /**
+     * Gets contact attributes that can be used for CRM integration.
+     * @returns {Promise<Object>} Resolves with contact attributes.
+     */
+    getContactAttributes() {
+        const contactInstance = contactService.getContactInstance();
+        if (!contactInstance) {
+            return Promise.reject(new Error("No active contact available."));
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                contactInstance.getAttributes({
+                    success: (attributes) => resolve(attributes),
+                    failure: (error) => reject(new Error(`Failed to get contact attributes: ${error}`))
+                });
+            } catch (error) {
+                reject(new Error(`Error getting contact attributes: ${error}`));
+            }
+        });
+    },
+
+    /**
+     * Creates a CRM record with contact information.
+     * @param {Object} crmSystem - The CRM system configuration object.
+     * @param {Object} recordData - The data to create the CRM record with.
+     * @returns {Promise<Object>} Resolves with the created CRM record.
+     */
+    createCrmRecord(crmSystem, recordData) {
+        return new Promise(async (resolve, reject) => {
+            try {
+                // Get contact attributes to enrich the CRM record
+                const contactAttributes = await this.getContactAttributes().catch(() => ({}));
+
+                // Combine contact attributes with record data
+                const enrichedData = {
+                    ...recordData,
+                    contactId: contactService.getContactInstance()?.getContactId(),
+                    agentId: agentService.getAgentInstance()?.getAgentId(),
+                    timestamp: new Date().toISOString(),
+                    contactAttributes
+                };
+
+                // This would be replaced with actual API call to the CRM system
+                resolve({
+                    success: true,
+                    recordId: `crm-${Date.now()}`,
+                    data: enrichedData
+                });
+            } catch (error) {
+                reject(new Error(`Error creating CRM record: ${error}`));
+            }
+        });
+    },
+
+    /**
+     * Updates a CRM record with contact information.
+     * @param {Object} crmSystem - The CRM system configuration object.
+     * @param {string} recordId - The ID of the record to update.
+     * @param {Object} updateData - The data to update the CRM record with.
+     * @returns {Promise<Object>} Resolves with the updated CRM record.
+     */
+    updateCrmRecord(crmSystem, recordId, updateData) {
+        return new Promise((resolve, reject) => {
+            try {
+                // This would be replaced with actual API call to the CRM system
+                resolve({
+                    success: true,
+                    recordId,
+                    data: updateData,
+                    timestamp: new Date().toISOString()
+                });
+            } catch (error) {
+                reject(new Error(`Error updating CRM record: ${error}`));
+            }
+        });
+    },
+
+    /**
+     * Searches for a customer in the CRM based on phone number.
+     * @param {Object} crmSystem - The CRM system configuration object.
+     * @param {string} phoneNumber - The phone number to search for.
+     * @returns {Promise<Array>} Resolves with matching customer records.
+     */
+    searchCustomerByPhone(crmSystem, phoneNumber) {
+        return new Promise((resolve, reject) => {
+            try {
+                // This would be replaced with actual API call to the CRM system
+                resolve({
+                    success: true,
+                    results: [
+                        {
+                            id: `customer-${Date.now()}`,
+                            phoneNumber,
+                            name: 'Sample Customer',
+                            email: 'customer@example.com',
+                            lastContact: new Date().toISOString()
+                        }
+                    ]
+                });
+            } catch (error) {
+                reject(new Error(`Error searching customer by phone: ${error}`));
+            }
+        });
     },
 
     /**
      * Accept an incoming call.
+     * @returns {Promise} Resolves when the call is successfully accepted.
      */
     acceptIncomingCall() {
-        contactService.acceptContact();
+        return Promise.resolve(contactService.acceptContact());
     },
 
     /**
      * Decline an incoming call.
+     * @returns {Promise} Resolves when the call is successfully declined.
      */
     declineIncomingCall() {
-        contactService.declineContact();
+        return Promise.resolve(contactService.declineContact());
     },
 
     /**
      * Mute the active call.
+     * @returns {Promise} Resolves when the call is successfully muted.
      */
     muteConnection() {
-        agentService.mute();
+        return Promise.resolve(agentService.mute());
     },
 
     /**
      * Unmute the active call.
+     * @returns {Promise} Resolves when the call is successfully unmuted.
      */
     unmuteConnection() {
-        agentService.unmute();
+        return Promise.resolve(agentService.unmute());
     },
 
     /**
      * Open the Amazon Connect CCP login modal.
+     * @returns {Promise} Resolves when the login modal is opened.
      */
     openLogin() {
         const container = document.getElementById('ccpContainer');
         container?.click(); // Trigger iframe login if needed
         callbacks.onLoginRequired?.();
+        return Promise.resolve();
     }
 };

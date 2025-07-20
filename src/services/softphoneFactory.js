@@ -1,5 +1,5 @@
 import amazonConnectService from './providers/AmazonConnect/amazonConnectService';
-// import twilioService from './twilioService';
+import twilioService from './providers/Twilio/twilioService';
 // import eightByEightService from './eightByEightService';
 
 /**
@@ -12,8 +12,8 @@ export function getSoftphoneService(provider = 'amazon-connect') {
     switch (provider) {
         case 'amazon-connect':
             return amazonConnectService;
-        // case 'twilio':
-        //   return twilioService;
+        case 'twilio':
+            return twilioService;
         // case '8x8':
         //   return eightByEightService;
         default:
