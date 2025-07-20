@@ -466,6 +466,63 @@ export default {
     },
 
     /**
+     * Restores the original call after a transfer has been initiated.
+     * This cancels the current transfer and reconnects with the original caller.
+     * @returns {Promise} Resolves when the call is successfully restored.
+     */
+    restoreCall() {
+        const contactInstance = contactService.getContactInstance();
+        if (!contactInstance) {
+            return Promise.reject(new Error("No active contact available to restore."));
+        }
+
+        return new Promise((resolve, reject) => {
+            try {
+                // Get all connections
+                const connections = contactInstance.getConnections();
+                
+                // Find the initial connection (customer)
+                const initialConnection = connections.find(conn => conn.getType() === window.connect.ConnectionType.INITIAL);
+                
+                // Find the agent connection
+                const agentConnection = contactInstance.getAgentConnection();
+                
+                if (!initialConnection) {
+                    return reject(new Error("Initial connection not found."));
+                }
+                
+                // Find any other connections (transfer targets)
+                const otherConnections = connections.filter(conn => 
+                    conn.getConnectionId() !== initialConnection.getConnectionId() && 
+                    conn.getConnectionId() !== agentConnection.getConnectionId()
+                );
+                
+                // Destroy all other connections (cancel transfers)
+                const destroyPromises = otherConnections.map(conn => 
+                    new Promise((res, rej) => {
+                        conn.destroy({
+                            success: () => res(),
+                            failure: (error) => rej(new Error(`Failed to destroy connection: ${error}`))
+                        });
+                    })
+                );
+                
+                // Wait for all connections to be destroyed
+                Promise.all(destroyPromises)
+                    .then(() => {
+                        // Restore the initial connection
+                        resolve(true);
+                    })
+                    .catch(error => {
+                        reject(new Error(`Error restoring call: ${error}`));
+                    });
+            } catch (error) {
+                reject(new Error(`Error restoring call: ${error}`));
+            }
+        });
+    },
+
+    /**
      * Open the Amazon Connect CCP login modal.
      * @returns {Promise} Resolves when the login modal is opened.
      */

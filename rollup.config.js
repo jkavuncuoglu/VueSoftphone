@@ -29,6 +29,12 @@ export default {
             css: true,
             compileTemplate: true
         }),
-        postcss()
+        postcss({
+            config: {
+                path: './postcss.config.js'
+            },
+            extensions: ['.css', '.scss', '.sass', '.postcss', '.sss'],
+            minimize: true
+        })
     ]
 }

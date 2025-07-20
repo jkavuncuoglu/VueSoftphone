@@ -1,9 +1,9 @@
-import { App } from 'vue'
 import Softphone from './components/Softphone.vue'
+import './assets/tailwind.css'
 
 export default {
-    install: (app: App) => {
-        app.component('Softphone', Softphone)
+    install: (Vue) => {
+        Vue.component('Softphone', Softphone)
     }
 }
 

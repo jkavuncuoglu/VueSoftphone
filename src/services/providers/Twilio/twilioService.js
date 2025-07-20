@@ -401,6 +401,67 @@ export default {
     },
 
     /**
+     * Restores the original call after a transfer has been initiated.
+     * This cancels the current transfer and reconnects with the original caller.
+     * @returns {Promise} Resolves when the call is successfully restored.
+     */
+    restoreCall() {
+        return new Promise((resolve, reject) => {
+            try {
+                // Get the current connection
+                const connection = contactService.getContactInstance();
+                if (!connection) {
+                    return Promise.reject(new Error("No active contact available to restore."));
+                }
+                
+                // In Twilio, we need to check if this is a conference call
+                if (connection.parameters && connection.parameters.get('ConferenceSid')) {
+                    // This is a conference call, we need to remove all participants except the customer
+                    const conferenceSid = connection.parameters.get('ConferenceSid');
+                    
+                    // Get all participants in the conference
+                    contactService.getConferenceParticipants(conferenceSid)
+                        .then(participants => {
+                            // Filter out the customer and agent
+                            const transferParticipants = participants.filter(p => 
+                                p.callSid !== connection.parameters.get('CallSid') && 
+                                !p.isCustomer && !p.isAgent
+                            );
+                            
+                            // Remove all transfer participants
+                            const removePromises = transferParticipants.map(p => 
+                                contactService.removeParticipantFromConference(conferenceSid, p.callSid)
+                            );
+                            
+                            // Wait for all participants to be removed
+                            Promise.all(removePromises)
+                                .then(() => {
+                                    resolve(true);
+                                })
+                                .catch(error => {
+                                    reject(new Error(`Error removing conference participants: ${error.message}`));
+                                });
+                        })
+                        .catch(error => {
+                            reject(new Error(`Error getting conference participants: ${error.message}`));
+                        });
+                } else {
+                    // This is a direct transfer, we need to cancel it
+                    contactService.cancelTransfer()
+                        .then(() => {
+                            resolve(true);
+                        })
+                        .catch(error => {
+                            reject(new Error(`Error canceling transfer: ${error.message}`));
+                        });
+                }
+            } catch (error) {
+                reject(new Error(`Error restoring call: ${error.message}`));
+            }
+        });
+    },
+
+    /**
      * Open the Twilio login modal.
      * @returns {Promise} Resolves when the login modal is opened.
      */

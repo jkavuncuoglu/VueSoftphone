@@ -9,50 +9,37 @@
         @transfer-call="handleCallTransfer"
         @end-call-transfer="handleEndCallTransfer"
         @disconnect-agent="handleDisconnectAgent"
+        @restore-call="handleRestoreCall"
     />
 
     <div class="tw-flex tw-gap-1 tw-justify-between tw-mt-1">
       <!-- Mute/Unmute Button -->
-      <lift-button
+      <button
           v-if="!muted"
           title="Mute"
-          label=""
-          color="default"
-          rounded="small"
-          class="tw-w-auto tw-h-[36px]"
+          class="tw-w-auto tw-h-[36px] tw-bg-gray-600 hover:tw-bg-gray-700 tw-text-white tw-font-bold tw-py-2 tw-px-4 tw-rounded-sm tw-flex tw-items-center tw-justify-center tw-transition-colors"
           @click="handleMuteAudio"
       >
-        <template #icon>
-          <font-awesome-icon icon="fa-solid fa-microphone-lines"/>
-        </template>
-      </lift-button>
+        <font-awesome-icon icon="fa-solid fa-microphone-lines"/>
+      </button>
 
-      <lift-button
+      <button
           v-else
           title="Unmute"
-          label=""
-          color="info"
-          rounded="small"
-          class="tw-w-auto tw-h-[36px]"
+          class="tw-w-auto tw-h-[36px] tw-bg-blue-600 hover:tw-bg-blue-700 tw-text-white tw-font-bold tw-py-2 tw-px-4 tw-rounded-sm tw-flex tw-items-center tw-justify-center tw-transition-colors"
           @click="handleUnmuteAudio"
       >
-        <template #icon>
-          <font-awesome-icon icon="fa-solid fa-microphone-lines-slash"/>
-        </template>
-      </lift-button>
+        <font-awesome-icon icon="fa-solid fa-microphone-lines-slash"/>
+      </button>
 
-      <lift-button
+      <button
           title="Hang Up"
-          label="Hang Up"
-          color="danger"
-          rounded="small"
-          class="tw-w-full tw-h-[36px]"
+          class="tw-w-full tw-h-[36px] tw-bg-red-600 hover:tw-bg-red-700 tw-text-white tw-font-bold tw-py-2 tw-px-4 tw-rounded-sm tw-flex tw-items-center tw-justify-center tw-transition-colors"
           @click="handleEndCall"
       >
-        <template #icon>
-          <font-awesome-icon icon="fa-solid fa-phone-slash"/>
-        </template>
-      </lift-button>
+        <font-awesome-icon icon="fa-solid fa-phone-slash" class="tw-mr-2"/>
+        Hang Up
+      </button>
     </div>
   </div>
 </template>
@@ -101,7 +88,8 @@ export default {
     "resume-call",
     "transfer-call",
     "disconnect-agent",
-    "end-transfer-call"
+    "end-transfer-call",
+    "restore-call"
   ],
   methods: {
     handleEndCall() {
@@ -132,6 +120,9 @@ export default {
     },
     handleEndCallTransfer() {
       this.$emit('end-transfer-call', true)
+    },
+    handleRestoreCall() {
+      this.$emit('restore-call', true)
     }
   },
 };

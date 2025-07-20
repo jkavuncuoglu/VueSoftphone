@@ -16,50 +16,69 @@
         {{ callDuration }}
       </p>
     </div>
-    <div v-if="showCcpStatusActions">
-      <lift-button
+    <div v-if="showCcpStatusActions && isAmazonConnect">
+      <button
           v-if="status === 'Offline'"
           title="Set Status Available"
-          label=""
-          color="default"
-          class="tw-m-0 tw-h-[36px] tw-w-full mb-1"
+          class="tw-m-0 tw-h-[36px] tw-w-full mb-1 tw-bg-gray-600 hover:tw-bg-gray-700 tw-text-white tw-font-bold tw-py-2 tw-px-4 tw-rounded-sm tw-flex tw-items-center tw-justify-center tw-transition-colors"
           @click="setAgentStatus('Available')"
       >
-        <template #icon>
-          <font-awesome-icon icon="fa-solid fa-signal"/>
-        </template>
-      </lift-button>
-      <lift-button
+        <font-awesome-icon icon="fa-solid fa-signal"/>
+      </button>
+      <button
           v-if="status === 'Available'"
           title="Set Status Offline"
-          label=""
-          color="default"
-          class="tw-w-full tw-m-0 tw-min-h-[36px] tw-h-full mb-1"
+          class="tw-w-full tw-m-0 tw-min-h-[36px] tw-h-full mb-1 tw-bg-gray-600 hover:tw-bg-gray-700 tw-text-white tw-font-bold tw-py-2 tw-px-4 tw-rounded-sm tw-flex tw-items-center tw-justify-center tw-transition-colors"
           @click="setAgentStatus('Offline')"
       >
-        <template #icon>
-          <font-awesome-icon icon="fa-solid fa-power-off"/>
-        </template>
-      </lift-button>
+        <font-awesome-icon icon="fa-solid fa-power-off"/>
+      </button>
     </div>
-    <div v-if="showCcpPopupActions">
-      <lift-button
+    <div v-if="showCcpStatusActions && isTwilio">
+      <button
+          v-if="status === 'Offline'"
+          title="Set Twilio Status Available"
+          class="tw-m-0 tw-h-[36px] tw-w-full mb-1 tw-bg-blue-600 hover:tw-bg-blue-700 tw-text-white tw-font-bold tw-py-2 tw-px-4 tw-rounded-sm tw-flex tw-items-center tw-justify-center tw-transition-colors"
+          @click="setTwilioAgentStatus('Available')"
+      >
+        <font-awesome-icon icon="fa-solid fa-signal" class="tw-mr-2"/>
+        Available
+      </button>
+      <button
+          v-if="status === 'Available'"
+          title="Set Twilio Status Offline"
+          class="tw-w-full tw-m-0 tw-min-h-[36px] tw-h-full mb-1 tw-bg-red-600 hover:tw-bg-red-700 tw-text-white tw-font-bold tw-py-2 tw-px-4 tw-rounded-sm tw-flex tw-items-center tw-justify-center tw-transition-colors"
+          @click="setTwilioAgentStatus('Offline')"
+      >
+        <font-awesome-icon icon="fa-solid fa-power-off" class="tw-mr-2"/>
+        Offline
+      </button>
+    </div>
+    <div v-if="showCcpPopupActions && isAmazonConnect">
+      <button
           title="Open Amazon Connect Control Panel"
-          label=""
-          color="default"
-          class="tw-w-full tw-m-0 tw-min-h-[36px] tw-h-full"
+          class="tw-w-full tw-m-0 tw-min-h-[36px] tw-h-full tw-bg-gray-600 hover:tw-bg-gray-700 tw-text-white tw-font-bold tw-py-2 tw-px-4 tw-rounded-sm tw-flex tw-items-center tw-justify-center tw-transition-colors"
           @click="openAwsCcp"
       >
-        <template #icon>
-          <font-awesome-icon icon="fa-solid fa-headset"/>
-        </template>
-      </lift-button>
+        <font-awesome-icon icon="fa-solid fa-headset"/>
+      </button>
+    </div>
+    <div v-if="showCcpPopupActions && isTwilio">
+      <button
+          title="Open Twilio Control Panel"
+          class="tw-w-full tw-m-0 tw-min-h-[36px] tw-h-full tw-bg-blue-600 hover:tw-bg-blue-700 tw-text-white tw-font-bold tw-py-2 tw-px-4 tw-rounded-sm tw-flex tw-items-center tw-justify-center tw-transition-colors"
+          @click="openTwilioCcp"
+      >
+        <font-awesome-icon icon="fa-solid fa-headset" class="tw-mr-2"/>
+        Twilio Panel
+      </button>
     </div>
   </div>
 </template>
 
 <script>
-import agentService from "../services/providers/AmazonConnect/agentService";
+import amazonAgentService from "../services/providers/AmazonConnect/agentService";
+import twilioAgentService from "../services/providers/Twilio/agentService";
 import {FontAwesomeIcon} from "@fortawesome/vue-fontawesome";
 import {library} from "@fortawesome/fontawesome-svg-core";
 import {faHeadset, faPowerOff, faSignal, faMicrophoneLinesSlash} from "@fortawesome/free-solid-svg-icons";
@@ -91,9 +110,13 @@ export default {
     contactActive: {
       type: Boolean,
       default: false
+    },
+    provider: {
+      type: String,
+      default: 'amazon-connect'
     }
   },
-  emits: ['open-ccp', 'call-duration'],
+  emits: ['open-ccp', 'open-twilio-ccp', 'call-duration'],
   data() {
     return {
       intervalId: null,
@@ -110,6 +133,12 @@ export default {
     }
   },
   computed: {
+    isAmazonConnect() {
+      return this.provider === 'amazon-connect';
+    },
+    isTwilio() {
+      return this.provider === 'twilio';
+    },
     callDuration: {
       get() {
         const hours = String(Math.floor(this.elapsedTime / 3600)).padStart(2, "0");
@@ -134,9 +163,55 @@ export default {
     openAwsCcp() {
       this.$emit("open-ccp", true);
     },
-    setAgentStatus(status) {
-      agentService.setAgentStatus(status);
+    
+    /**
+     * Method to open the Twilio Control Panel.
+     */
+    openTwilioCcp() {
+      this.$emit("open-twilio-ccp", true);
     },
+    
+    /**
+     * Set Amazon Connect agent status
+     * @param {string} status - The status to set
+     */
+    setAgentStatus(status) {
+      try {
+        amazonAgentService.setAgentStatus(status)
+          .then(() => {
+            console.log(`Amazon Connect agent status set to: ${status}`);
+          })
+          .catch(error => {
+            console.error(`Error setting Amazon Connect agent status: ${error.message}`);
+          });
+      } catch (error) {
+        console.error(`Error setting Amazon Connect agent status: ${error.message}`);
+      }
+    },
+    
+    /**
+     * Set Twilio agent status
+     * @param {string} status - The status to set
+     */
+    setTwilioAgentStatus(status) {
+      try {
+        twilioAgentService.setAgentStatus(status)
+          .then(() => {
+            console.log(`Twilio agent status set to: ${status}`);
+          })
+          .catch(error => {
+            console.error(`Error setting Twilio agent status: ${error.message}`);
+          });
+      } catch (error) {
+        console.error(`Error setting Twilio agent status: ${error.message}`);
+      }
+    },
+    
+    /**
+     * Format the status text for display
+     * @param {string} string - The status string to format
+     * @returns {string} - The formatted status string
+     */
     formatStatus(string) {
       switch (string) {
         case 'CallingCustomer':
@@ -151,11 +226,31 @@ export default {
           return this.ucWords(string);
       }
     },
+    
+    /**
+     * Convert a string to title case (first letter of each word capitalized)
+     * @param {string} str - The string to convert
+     * @returns {string} - The converted string
+     */
+    ucWords(str) {
+      if (!str) return '';
+      return str
+        .toLowerCase()
+        .replace(/(?:^|\s)\S/g, function(a) { return a.toUpperCase(); });
+    },
+    
+    /**
+     * Start the call duration timer
+     */
     startTimer() {
       this.intervalId = setInterval(() => {
         this.elapsedTime++;
       }, 1000);
     },
+    
+    /**
+     * Stop the call duration timer and emit the duration
+     */
     stopTimer() {
       const duration = this.callDuration
       clearInterval(this.intervalId);
