@@ -1,6 +1,6 @@
 {
   "name": "@jkavuncuoglu/vue-softphone",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A provider independent Vue.js 2 softphone component",
   "main": "dist/vue-softphone.js",
   "module": "dist/vue-softphone.esm.js",
