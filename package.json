@@ -1,5 +1,5 @@
 {
-  "name": "vue-softphone",
+  "name": "@jkavuncuoglu/vue-softphone",
   "version": "1.0.0",
   "description": "A provider independent Vue.js 2 softphone component",
   "main": "dist/vue-softphone.js",
@@ -67,12 +67,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/vue-softphone.git"
+    "url": "git+https://github.com/jkavuncuoglu/vue-softphone.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/vue-softphone/issues"
+    "url": "https://github.com/jkavuncuoglu/vue-softphone/issues"
   },
-  "homepage": "https://github.com/yourusername/vue-softphone#readme",
+  "homepage": "https://github.com/jkavuncuoglu/vue-softphone#readme",
   "sideEffects": false,
   "publishConfig": {
     "access": "public"
