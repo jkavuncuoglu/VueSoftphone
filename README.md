@@ -318,6 +318,6 @@ If you find this project useful, you can help keep it alive and growing! Your su
 Even a small contribution goes a long way. You can support the project in any of these ways:
 
 - [Sponsor me on GitHub](https://github.com/sponsors/jkavuncuoglu)
-- [Buy me a coffee](https://www.buymeacoffee.com/jkavuncuoglu)
+- [Buy me a coffee](https://buymeacoffee.com/jkavuncuoglu)
 
 Thank you for helping make this project better and accessible for everyone! 🚀
