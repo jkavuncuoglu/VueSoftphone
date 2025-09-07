@@ -10,7 +10,7 @@
   ],
   "scripts": {
     "build": "rollup -c",
-    "prepare": "npm run build",
+    "prepublishOnly": "npm run build",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage"
@@ -63,5 +63,17 @@
     "telephony"
   ],
   "author": "Jeremy Kavuncuoglu <jkavuncuoglu@outlook.com>",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yourusername/vue-softphone.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/vue-softphone/issues"
+  },
+  "homepage": "https://github.com/yourusername/vue-softphone#readme",
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  }
 }

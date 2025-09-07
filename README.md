@@ -104,7 +104,7 @@ export default {
 </script>
 ```
 
-## Architecture Overview
+## 🧩 Architecture Overview
 
 ### Components
 
@@ -224,7 +224,7 @@ interface ISoftphoneProviderService {
 }
 ```
 
-## Adding a New Provider
+## ➕ Adding a New Provider
 
 1. Create a new service file in `src/services/providers/YourProvider/` (e.g., `zoomPhoneService.js`)
 2. Implement the `ISoftphoneProviderService` interface methods
@@ -250,7 +250,7 @@ export function getSoftphoneService(provider = 'amazon-connect') {
 }
 ```
 
-## Diagnostics
+## 🔍 Diagnostics
 
 The component includes built-in WebRTC diagnostics that run automatically on initialization:
 
@@ -261,7 +261,7 @@ The component includes built-in WebRTC diagnostics that run automatically on ini
 
 If any critical tests fail (microphone or WebRTC), a non-dismissible modal will be displayed to help the user resolve the issues.
 
-## Contributing
+## 🤝 Contributing
 
 Contributions are welcome! Please follow these steps:
 
@@ -271,7 +271,7 @@ Contributions are welcome! Please follow these steps:
 4. Push to the branch: `git push origin feature/my-new-feature`
 5. Submit a pull request
 
-### Development Setup
+### 🛠️ Development Setup
 
 ```bash
 # Install dependencies
@@ -284,7 +284,7 @@ npm run build
 npm test
 ```
 
-## Testing
+## 🧪 Testing
 
 The component includes comprehensive tests using Jest:
 
@@ -299,10 +299,25 @@ npm run test:coverage
 npm run test:watch
 ```
 
-## License
+## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-## Author
+## 💼 Author
 
 Jeremy Kavuncuoglu <jkavuncuoglu@outlook.com>
+
+## 💖 Support This Project
+
+If you find this project useful, you can help keep it alive and growing! Your support allows me to:
+
+- Dedicate more time to development and maintenance
+- Cover hosting, tools, and other project costs
+- Build new features and improvements
+
+Even a small contribution goes a long way. You can support the project in any of these ways:
+
+- [Sponsor me on GitHub](https://github.com/sponsors/jkavuncuoglu)
+- [Buy me a coffee](https://www.buymeacoffee.com/jkavuncuoglu)
+
+Thank you for helping make this project better and accessible for everyone! 🚀
