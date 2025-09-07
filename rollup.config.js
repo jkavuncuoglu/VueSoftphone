@@ -27,7 +27,8 @@ export default {
         commonjs(),
         vue({
             css: true,
-            compileTemplate: true
+            compileTemplate: true,
+            template: { optimizeSSR: false }
         }),
         postcss({
             config: {

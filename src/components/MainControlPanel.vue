@@ -45,7 +45,7 @@
 </template>
 
 <script>
-import CallTransferOptions from "./CallTransferOptions.vue";
+import CallTransferOptions from "./CallTransferActions.vue";
 import {FontAwesomeIcon} from "@fortawesome/vue-fontawesome";
 import {faMicrophoneLines, faMicrophoneLinesSlash} from "@fortawesome/free-solid-svg-icons";
 import {library} from "@fortawesome/fontawesome-svg-core";
